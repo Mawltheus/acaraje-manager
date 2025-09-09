@@ -1,0 +1,21 @@
+# Configuração para deploy automático no Render
+# Documentação: https://render.com/docs/deploy-web-applications
+
+services:
+  - type: web
+    name: acaraje-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://acarajeeabaradolouro.netlify.app
+    plan: free
+    region: ohio  # Mais próximo do Brasil
+    autoDeploy: true
