@@ -1,12 +1,16 @@
-﻿{
+const fs = require('fs');
+const path = require('path');
+
+// Usando caracteres escapados para garantir a correta codificação
+const packageContent = {
   "name": "acaraje-manager",
   "version": "1.0.0",
-  "description": "Sistema de gerenciamento para Acaraje e Abara do Louro",
+  "description": "Sistema de gerenciamento para Acaraj\u00E9 e Abar\u00E1 do Louro",
   "main": "server-demo.js",
   "scripts": {
     "start": "node server-demo.js",
     "dev": "nodemon server-demo.js",
-    "build": "echo \"Build concluido com sucesso\"",
+    "build": "echo \"No build necessário\"",
     "migrate": "node scripts/init-db.js"
   },
   "dependencies": {
@@ -25,11 +29,20 @@
     "nodemon": "^3.0.1"
   },
   "keywords": [
-    "acaraje",
+    "acaraj\u00E9",
     "management",
     "dashboard",
     "restaurant"
   ],
   "author": "Desenvolvedor",
   "license": "MIT"
-}
+};
+
+// Escreve o conteúdo formatado no arquivo package.json
+fs.writeFileSync(
+  path.join(__dirname, 'package.json'),
+  JSON.stringify(packageContent, null, 2),
+  { encoding: 'utf8' }
+);
+
+console.log('Arquivo package.json corrigido com sucesso!');
