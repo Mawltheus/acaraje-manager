@@ -1,37 +1,30 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 
-const ingredientSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  available: {
-    type: Boolean,
-    default: true
-  },
-  category: {
-    type: String,
-    enum: ['proteina', 'vegetal', 'molho', 'tempero', 'outro'],
-    default: 'outro'
-  },
-  description: {
-    type: String,
-    default: ''
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+module.exports = (sequelize) => {
+  const Ingredient = sequelize.define('Ingredient', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    price: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    available: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+  }, {
+    tableName: 'ingredients',
+    timestamps: true,
+  });
 
-ingredientSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-module.exports = mongoose.model('Ingredient', ingredientSchema);
+  return Ingredient;
+};

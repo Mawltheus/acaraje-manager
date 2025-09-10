@@ -1,0 +1,39 @@
+[build]
+  # Diretório que contém os arquivos estáticos
+  publish = "public"
+  # Comando para construir o projeto (se necessário)
+  command = "npm run build"
+
+# Redirecionamentos para SPA (Single Page Application)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Configurações de cabeçalhos para segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; connect-src 'self' https://*.netlify.app http://localhost:3000;"
+
+# Variáveis de ambiente (substitua com suas configurações reais)
+[build.environment]
+  NODE_VERSION = "16"
+  NPM_VERSION = "8"
+  # Defina a URL da sua API aqui
+  REACT_APP_API_URL = "https://seu-backend-api.com/api"
+
+# Configurações de branch
+[context.production.environment]
+  NODE_ENV = "production"
+  # Substitua pela URL do seu backend em produção
+  REACT_APP_API_URL = "https://seu-backend-api.com/api"
+
+[context.deploy-preview.environment]
+  NODE_ENV = "development"
+  # URL para preview (pode ser localhost ou um ambiente de teste)
+  REACT_APP_API_URL = "http://localhost:3000/api"

@@ -1,96 +1,80 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 
-const orderItemSchema = new mongoose.Schema({
-  menuItemId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'MenuItem',
-    required: true
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  price: {
-    type: Number,
-    required: true
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  ingredients: [{
-    name: String,
-    selected: Boolean
-  }],
-  subtotal: {
-    type: Number,
-    required: true
-  }
-});
-
-const orderSchema = new mongoose.Schema({
-  orderNumber: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  customerInfo: {
-    name: {
-      type: String,
-      required: true
+module.exports = (sequelize) => {
+  const Order = sequelize.define('Order', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
-    phone: {
-      type: String,
-      required: true
+    orderNumber: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
     },
-    address: {
-      street: String,
-      neighborhood: String,
-      complement: String
-    }
-  },
-  items: [orderItemSchema],
-  deliveryArea: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'DeliveryArea'
-  },
-  deliveryFee: {
-    type: Number,
-    default: 0
-  },
-  subtotal: {
-    type: Number,
-    required: true
-  },
-  total: {
-    type: Number,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['cash', 'pix', 'card'],
-    required: true
-  },
-  notes: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+    customerName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    customerPhone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    customerAddress: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    customerNeighborhood: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    customerComplement: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    paymentMethod: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    paymentChange: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    deliveryFee: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    subtotal: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    total: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Pendente',
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    orderDate: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  }, {
+    tableName: 'orders',
+    timestamps: true,
+  });
 
-orderSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+  Order.associate = (models) => {
+    Order.hasMany(models.OrderItem, { foreignKey: 'orderId', as: 'items' });
+  };
 
-module.exports = mongoose.model('Order', orderSchema);
+  return Order;
+};

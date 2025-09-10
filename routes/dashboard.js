@@ -1,8 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const Order = require('../models/Order');
-const MenuItem = require('../models/MenuItem');
-const DeliveryArea = require('../models/DeliveryArea');
+const { sequelize, Sequelize } = require('../config/database');
+const { Op } = Sequelize;
+const Order = require('../models/Order')(sequelize, Sequelize.DataTypes);
+const MenuItem = require('../models/MenuItem')(sequelize, Sequelize.DataTypes);
+const DeliveryArea = require('../models/DeliveryArea')(sequelize, Sequelize.DataTypes);
+const OrderItem = require('../models/OrderItem')(sequelize, Sequelize.DataTypes);
+
+// Configurar associações
+Order.hasMany(OrderItem, { foreignKey: 'orderId' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
+OrderItem.belongsTo(MenuItem, { foreignKey: 'menuItemId' });
 
 // GET - Dashboard principal com estatísticas
 router.get('/stats', async (req, res) => {
@@ -13,41 +21,56 @@ router.get('/stats', async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Pedidos de hoje
-    const todayOrders = await Order.find({
-      createdAt: { $gte: today, $lt: tomorrow }
+    const todayOrders = await Order.findAll({
+      where: {
+        createdAt: { [Op.gte]: today, [Op.lt]: tomorrow }
+      },
+      include: [{ model: OrderItem, include: [MenuItem] }]
     });
 
     // Estatísticas gerais
-    const totalOrders = await Order.countDocuments();
-    const pendingOrders = await Order.countDocuments({ status: 'pending' });
-    const preparingOrders = await Order.countDocuments({ status: 'preparing' });
+    const totalOrders = await Order.count();
+    const pendingOrders = await Order.count({ where: { status: 'pending' } });
+    const preparingOrders = await Order.count({ where: { status: 'preparing' } });
     
     // Receita de hoje
     const todayRevenue = todayOrders
       .filter(order => order.status !== 'cancelled')
-      .reduce((sum, order) => sum + order.total, 0);
+      .reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
 
     // Receita total
-    const allOrders = await Order.find({ status: { $ne: 'cancelled' } });
-    const totalRevenue = allOrders.reduce((sum, order) => sum + order.total, 0);
+    const allOrders = await Order.findAll({ 
+      where: { status: { [Op.ne]: 'cancelled' } },
+      include: [{ model: OrderItem, include: [MenuItem] }]
+    });
+    
+    const totalRevenue = allOrders.reduce((sum, order) => 
+      sum + parseFloat(order.total || 0), 0
+    );
 
     // Itens mais vendidos (últimos 30 dias)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const recentOrders = await Order.find({
-      createdAt: { $gte: thirtyDaysAgo },
-      status: { $ne: 'cancelled' }
-    }).populate('items.menuItemId');
+    const recentOrders = await Order.findAll({
+      where: {
+        createdAt: { [Op.gte]: thirtyDaysAgo },
+        status: { [Op.ne]: 'cancelled' }
+      },
+      include: [{
+        model: OrderItem,
+        include: [MenuItem]
+      }]
+    });
 
     const itemStats = {};
     recentOrders.forEach(order => {
-      order.items.forEach(item => {
-        const itemName = item.name;
+      order.OrderItems.forEach(item => {
+        const itemName = item.MenuItem ? item.MenuItem.name : 'Item não encontrado';
         if (!itemStats[itemName]) {
           itemStats[itemName] = { name: itemName, quantity: 0, revenue: 0 };
         }
-        itemStats[itemName].quantity += item.quantity;
+        itemStats[itemName].quantity += item.quantity || 0;
         itemStats[itemName].revenue += item.subtotal;
       });
     });
@@ -57,14 +80,18 @@ router.get('/stats', async (req, res) => {
       .slice(0, 5);
 
     // Pedidos por status
-    const ordersByStatus = await Order.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    const ordersByStatusResult = await Order.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status']
+    });
+    
+    const ordersByStatus = ordersByStatusResult.map(item => ({
+      _id: item.status,
+      count: item.get('count')
+    }));
 
     res.json({
       todayStats: {
@@ -80,60 +107,85 @@ router.get('/stats', async (req, res) => {
       },
       topItems,
       ordersByStatus,
-      recentOrders: todayOrders.slice(0, 10)
+      recentOrders: todayOrders.slice(0, 10).map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        total: order.total,
+        customerName: order.customerName || 'Cliente não identificado',
+        createdAt: order.createdAt
+      })),
+      websiteUrl: sequelize.websiteUrl // Inclui o link do site na resposta
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// GET - Relatório de vendas por período
+// GET - Relatório de vendas
 router.get('/sales-report', async (req, res) => {
   try {
     const { startDate, endDate, groupBy = 'day' } = req.query;
     
-    let matchStage = { status: { $ne: 'cancelled' } };
+    const where = { status: { [Op.ne]: 'cancelled' } };
     
     if (startDate && endDate) {
-      matchStage.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+      where.createdAt = {
+        [Op.gte]: new Date(startDate),
+        [Op.lt]: new Date(new Date(endDate).setDate(new Date(endDate).getDate() + 1))
       };
     }
 
-    let groupStage;
+    let salesData;
+    
     if (groupBy === 'day') {
-      groupStage = {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-          day: { $dayOfMonth: '$createdAt' }
-        },
-        orders: { $sum: 1 },
-        revenue: { $sum: '$total' },
-        date: { $first: '$createdAt' }
-      };
+      salesData = await Order.findAll({
+        attributes: [
+          [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('SUM', sequelize.col('total')), 'total']
+        ],
+        where,
+        group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
+        order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']],
+        raw: true
+      });
     } else if (groupBy === 'month') {
-      groupStage = {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' }
-        },
-        orders: { $sum: 1 },
-        revenue: { $sum: '$total' },
-        date: { $first: '$createdAt' }
-      };
+      salesData = await Order.findAll({
+        attributes: [
+          [sequelize.fn('YEAR', sequelize.col('createdAt')), 'year'],
+          [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('SUM', sequelize.col('total')), 'total']
+        ],
+        where,
+        group: [
+          sequelize.fn('YEAR', sequelize.col('createdAt')),
+          sequelize.fn('MONTH', sequelize.col('createdAt'))
+        ],
+        order: [
+          [sequelize.fn('YEAR', sequelize.col('createdAt')), 'ASC'],
+          [sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']
+        ],
+        raw: true
+      });
     }
 
-    const salesData = await Order.aggregate([
-      { $match: matchStage },
-      { $group: groupStage },
-      { $sort: { 'date': 1 } }
-    ]);
+    // Formatar os dados para o formato esperado pelo frontend
+    const formattedData = salesData.map(item => ({
+      _id: item.date || `${item.year}-${String(item.month).padStart(2, '0')}`,
+      date: item.date || new Date(item.year, item.month - 1, 1).toISOString(),
+      orders: parseInt(item.count) || 0,
+      revenue: parseFloat(item.total) || 0
+    }));
 
-    res.json(salesData);
+    res.json(formattedData);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Erro ao gerar relatório de vendas:', error);
+    res.status(500).json({ 
+      message: 'Erro ao gerar relatório de vendas',
+      error: error.message 
+    });
   }
 });
 

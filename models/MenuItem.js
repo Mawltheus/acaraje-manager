@@ -1,67 +1,42 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 
-const menuItemSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String,
-    required: true
-  },
-  category: {
-    type: String,
-    enum: ['acarajes', 'abaras', 'bebidas', 'outros'],
-    required: true
-  },
-  price: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  image: {
-    type: String,
-    default: ''
-  },
-  available: {
-    type: Boolean,
-    default: true
-  },
-  ingredients: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Ingredient'
-  }],
-  customizableIngredients: [{
-    ingredient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Ingredient'
+module.exports = (sequelize) => {
+  const MenuItem = sequelize.define('MenuItem', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
-    required: {
-      type: Boolean,
-      default: false
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
-    defaultSelected: {
-      type: Boolean,
-      default: true
-    }
-  }],
-  preparationTime: {
-    type: Number,
-    default: 15 // em minutos
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    category: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Outros',
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    available: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+  }, {
+    tableName: 'menu_items',
+    timestamps: true,
+  });
 
-menuItemSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-module.exports = mongoose.model('MenuItem', menuItemSchema);
+  return MenuItem;
+};

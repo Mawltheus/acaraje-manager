@@ -1,41 +1,35 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 
-const deliveryAreaSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  fee: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  active: {
-    type: Boolean,
-    default: true
-  },
-  estimatedTime: {
-    type: Number,
-    default: 30 // em minutos
-  },
-  description: {
-    type: String,
-    default: ''
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+module.exports = (sequelize) => {
+  const DeliveryArea = sequelize.define('DeliveryArea', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    fee: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    deliveryTime: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    active: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+  }, {
+    tableName: 'delivery_areas',
+    timestamps: true,
+  });
 
-deliveryAreaSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-module.exports = mongoose.model('DeliveryArea', deliveryAreaSchema);
+  return DeliveryArea;
+};
